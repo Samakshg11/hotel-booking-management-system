@@ -96,7 +96,7 @@ Per assessment Rule 6 (*"If a requirement is ambiguous, choose the simplest safe
   - Room type and room management.
   - Real-time availability search with pagination.
   - Atomic room hold with transaction fallback on duplicate key collision.
-- [ ] **Phase 3: State Machine, Idempotent Payments & Cancellations**
+- [x] **Phase 3: State Machine, Idempotent Payments & Cancellations**
   - Deterministic simulated card payment.
   - Idempotency middleware & cache lookup.
   - Cancellation with 24-hour refund window policy.

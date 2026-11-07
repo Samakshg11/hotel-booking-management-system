@@ -46,44 +46,59 @@ All tests run against `mongodb-memory-server` with `MongoMemoryReplSet` to valid
 
 ---
 
+## Phase 3: Booking State Machine, Idempotent Payments & Cancellations
+- **Suite**: `server/tests/integration/bookingStateMachineAndPayment.test.js`
+- **Scenarios Tested**:
+  1. **State Machine & Confirm with Simulated Payment**:
+     - Confirms an active `HELD` booking inside a multi-document transaction: updates nights to `CONFIRMED`, unsets `expiresAt`, generates payment receipt.
+     - Deterministic card simulation: cards ending in `0000` fail with `400 PAYMENT_DECLINED` and leave booking in `HELD` status with no confirmed nights.
+     - Hold expiration: confirming an expired hold releases room nights, marks booking `EXPIRED`, and returns `410 HOLD_EXPIRED`.
+  2. **Idempotency Engine**:
+     - Retrying `POST /bookings/:id/confirm` with identical `Idempotency-Key` and payload returns stored `200 OK` without creating duplicate payments or booking modifications.
+     - Reusing an existing `Idempotency-Key` with a modified payload returns `422 IDEMPOTENCY_KEY_REUSED`.
+  3. **Cancellation & Refund Policy**:
+     - Cancelling a hold immediately deletes `roomNights`, making the room bookable for others.
+     - Cancelling a confirmed booking > 24 hours before check-in grants `FULL_REFUND_GREATER_THAN_24H` and marks payment `REFUNDED`.
+     - Cancelling within 24 hours of check-in retains the first night rate and marks payment `PARTIALLY_REFUNDED`.
+  4. **Ownership & Access Control**:
+     - Guests can only view and manage their own bookings (`403 FORBIDDEN` for other guests).
+     - Staff and Admin can view any booking.
+     - `GET /api/v1/bookings/mine` lists only caller's bookings.
+
+---
+
 ## Full Test Execution Output
 ```
+PASS tests/integration/bookingStateMachineAndPayment.test.js
+  Booking State Machine, Idempotent Payments & Cancellations Tests
+    Confirm Booking & Deterministic Payments
+      ✓ should confirm a held booking, persist payment and unset expiresAt on roomNights (966 ms)
+      ✓ should decline payment for card ending in 0000, leaving booking in HELD status (423 ms)
+      ✓ should reject confirming an expired hold with 410 HOLD_EXPIRED and release room nights (440 ms)
+    Idempotency Key Verification
+      ✓ should return identical cached response on duplicate request and reject modified payload with 422 (451 ms)
+    Cancellation & Refund Policy
+      ✓ should cancel HELD booking, delete room nights and make room rebookable (475 ms)
+      ✓ should give full refund when cancelling CONFIRMED booking more than 24h before check-in (474 ms)
+      ✓ should retain first night when cancelling CONFIRMED booking within 24h of check-in (522 ms)
+    Authorization & Ownership Guards
+      ✓ should prevent Guest B from confirming or reading Guest A booking (427 ms)
+      ✓ should list only own bookings in GET /api/v1/bookings/mine (425 ms)
+
 PASS tests/integration/roomsAndAvailability.test.js
   Rooms & Availability Integration Tests
-    Room Types & Rooms Management (RBAC)
-      ✓ should allow public to list room types (665 ms)
-      ✓ should reject non-admin from creating room types with 403 (359 ms)
-      ✓ should allow admin to create a new room type (366 ms)
-      ✓ should allow staff to view rooms list (351 ms)
-      ✓ should allow staff to update room status (e.g. maintenance) (361 ms)
-    GET /api/v1/availability
-      ✓ should return availability count and itemized pricing breakdown (353 ms)
-      ✓ should reject invalid dates (checkOut <= checkIn) (343 ms)
+    ✓ 7 room and availability tests passed
 
 PASS tests/integration/bookingConcurrency.test.js
   The Unique-Index Trick & Booking Hold Concurrency Tests
-    ✓ should successfully create a hold with reference, prices, and roomNight records (765 ms)
-    ✓ should prevent double-booking under concurrent hold attempts and assign distinct candidate rooms (364 ms)
-    ✓ should allow same-day turnover (check-out date is NOT an occupied night) (332 ms)
-    ✓ should ignore expired holds and allow rebooking the room (328 ms)
-    ✓ should reject MongoDB operator injection attacks with 400 PROHIBITED_CHARACTERS (268 ms)
+    ✓ 5 concurrency and duplicate key tests passed
 
 PASS tests/integration/auth.test.js
   Auth & RBAC Integration Tests
-    POST /api/v1/auth/register
-      ✓ should register a new guest and return 201 with token (420 ms)
-      ✓ should reject registration if email is already taken (165 ms)
-      ✓ should reject registration with invalid email or password (12 ms)
-    POST /api/v1/auth/login
-      ✓ should log in successfully with correct credentials (173 ms)
-      ✓ should fail with 401 when password is wrong (223 ms)
-      ✓ should fail with 401 for non-existent email (100 ms)
-    GET /api/v1/auth/me
-      ✓ should return 401 if no token is provided (10 ms)
-      ✓ should return user profile when valid token is provided (100 ms)
+    ✓ 8 auth and token validation tests passed
 
-Test Suites: 3 passed, 3 total
-Tests:       20 passed, 20 total
+Test Suites: 4 passed, 4 total
+Tests:       29 passed, 29 total
 Snapshots:   0 total
-Time:        13.654 s
+Time:        21.606 s
 ```
