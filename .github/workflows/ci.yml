@@ -36,3 +36,4 @@ jobs:
         env:
           NODE_ENV: test
           JWT_SECRET: ci_test_secret_key_minimum_32_characters_length
+
