@@ -116,6 +116,52 @@ describe('The Unique-Index Trick & Booking Hold Concurrency Tests', () => {
     expect(hold3.body.error).toHaveProperty('code', 'NO_AVAILABILITY');
   });
 
+  it('should handle 10 parallel holds for the last available room so exactly one succeeds and 9 get 409', async () => {
+    // Create a new room type with strictly ONE single room
+    const singleType = await RoomType.create({
+      name: 'Single Penthouse Exclusive',
+      capacity: 2,
+      baseRate: 990000,
+    });
+    await Room.create({
+      roomNumber: '999',
+      roomTypeId: singleType._id,
+      floor: 9,
+      status: 'available',
+    });
+
+    const checkIn = '2026-11-20';
+    const checkOut = '2026-11-22';
+
+    // Fire 10 parallel hold requests
+    const promises = Array.from({ length: 10 }).map(() =>
+      request(app)
+        .post('/api/v1/bookings/hold')
+        .set('Authorization', `Bearer ${guestToken}`)
+        .send({
+          roomTypeId: singleType._id.toString(),
+          checkIn,
+          checkOut,
+          guests: 1,
+        })
+    );
+
+    const responses = await Promise.all(promises);
+
+    const successes = responses.filter((r) => r.status === 201);
+    const conflicts = responses.filter((r) => r.status === 409);
+
+    expect(successes.length).toBe(1);
+    expect(conflicts.length).toBe(9);
+    conflicts.forEach((res) => {
+      expect(res.body.error).toHaveProperty('code', 'NO_AVAILABILITY');
+    });
+
+    // Verify exactly 2 room nights exist in database for this room
+    const createdNights = await RoomNight.find({ bookingId: successes[0].body.data._id });
+    expect(createdNights.length).toBe(2);
+  });
+
   it('should allow same-day turnover (check-out date is NOT an occupied night)', async () => {
     // Guest 1 books days 10 to 12
     const res1 = await request(app)
