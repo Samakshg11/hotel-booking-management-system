@@ -1,0 +1,115 @@
+openapi: 3.0.3
+info:
+  title: Hotel Management System API
+  description: >
+    Production-grade Hotel Management API built for Algions AI Labs take-home assessment.
+    Enforces server-side RBAC, transaction-safe bookings with the unique-index concurrency pattern,
+    idempotent simulated payments, and audit logs.
+  version: 1.0.0
+servers:
+  - url: /api/v1
+    description: API v1 Base Path
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        example: UP
+                      timestamp:
+                        type: string
+                      uptime:
+                        type: number
+
+  /auth/register:
+    post:
+      summary: Register a new guest account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - password
+              properties:
+                name:
+                  type: string
+                  example: Jane Doe
+                email:
+                  type: string
+                  format: email
+                  example: jane@example.com
+                password:
+                  type: string
+                  format: password
+                  example: Secret123!
+                phone:
+                  type: string
+                  example: '+91 98765 43210'
+      responses:
+        '201':
+          description: Guest registered successfully
+        '400':
+          description: Validation error
+        '409':
+          description: Email already registered
+
+  /auth/login:
+    post:
+      summary: Authenticate with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: guest@hotel.com
+                password:
+                  type: string
+                  format: password
+                  example: Password123!
+      responses:
+        '200':
+          description: Login successful with JWT token
+        '401':
+          description: Invalid email or password
+
+  /auth/me:
+    get:
+      summary: Get authenticated user profile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current user profile
+        '401':
+          description: Unauthenticated
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
