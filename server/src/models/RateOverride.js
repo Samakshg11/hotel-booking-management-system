@@ -36,3 +36,4 @@ rateOverrideSchema.methods.toJSON = function () {
 };
 
 module.exports = mongoose.model('RateOverride', rateOverrideSchema);
+

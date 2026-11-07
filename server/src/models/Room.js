@@ -41,3 +41,4 @@ roomSchema.methods.toJSON = function () {
 };
 
 module.exports = mongoose.model('Room', roomSchema);
+

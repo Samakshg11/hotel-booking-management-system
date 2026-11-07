@@ -91,3 +91,4 @@ Any discrepancy in reported numbers can be traced back to:
 1. `auditLogs`: Every status transition records `actorId`, `actorRole`, `before`, and `after`.
 2. `payments`: Every payment receipt records simulated provider transaction IDs and exact paise amounts.
 3. `roomNights`: Physical daily slot records verify the exact occupancy grid.
+

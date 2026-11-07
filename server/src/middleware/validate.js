@@ -23,7 +23,7 @@ function validate({ body, query, params }) {
           field: e.path.join('.'),
           message: e.message,
         }));
-        return next(new BadRequestError('Validation failed', details));
+        return next(new BadRequestError('Validation failed', details, 'VALIDATION_ERROR'));
       }
       next(err);
     }

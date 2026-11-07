@@ -20,4 +20,24 @@ All tests run against `mongodb-memory-server` with `MongoMemoryReplSet` to valid
      - Returns authenticated user details without sensitive fields.
      - Rejects missing/malformed Bearer tokens with `401 UNAUTHORIZED`.
 
-*(Logs will be appended upon execution)*
+### Test Output:
+```
+PASS tests/integration/auth.test.js
+  Auth & RBAC Integration Tests
+    POST /api/v1/auth/register
+      ✓ should register a new guest and return 201 with token (151 ms)
+      ✓ should reject registration if email is already taken (103 ms)
+      ✓ should reject registration with invalid email or password (8 ms)
+    POST /api/v1/auth/login
+      ✓ should log in successfully with correct credentials (171 ms)
+      ✓ should fail with 401 when password is wrong (177 ms)
+      ✓ should fail with 401 for non-existent email (96 ms)
+    GET /api/v1/auth/me
+      ✓ should return 401 if no token is provided (6 ms)
+      ✓ should return user profile when valid token is provided (99 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       8 passed, 8 total
+Snapshots:   0 total
+Time:        3.518 s
+```

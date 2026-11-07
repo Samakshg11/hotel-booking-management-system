@@ -10,8 +10,8 @@ class AppError extends Error {
 }
 
 class BadRequestError extends AppError {
-  constructor(message = 'Bad request', details = null) {
-    super(message, 400, 'BAD_REQUEST', details);
+  constructor(message = 'Bad request', details = null, code = 'BAD_REQUEST') {
+    super(message, 400, code, details);
   }
 }
 

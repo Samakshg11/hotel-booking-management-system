@@ -29,3 +29,4 @@ router.post('/login', authLimiter, validate({ body: loginSchema }), authControll
 router.get('/me', authenticate, authController.getMe);
 
 module.exports = router;
+

@@ -48,3 +48,4 @@ roomNightSchema.methods.toJSON = function () {
 };
 
 module.exports = mongoose.model('RoomNight', roomNightSchema);
+

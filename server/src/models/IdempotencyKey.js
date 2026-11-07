@@ -40,3 +40,4 @@ const idempotencyKeySchema = new mongoose.Schema(
 idempotencyKeySchema.index({ key: 1, userId: 1 }, { unique: true });
 
 module.exports = mongoose.model('IdempotencyKey', idempotencyKeySchema);
+

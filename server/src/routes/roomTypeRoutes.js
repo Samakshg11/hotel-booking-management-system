@@ -44,3 +44,4 @@ router.patch(
 router.delete('/:id', authenticate, authorize('admin'), roomController.deleteRoomType);
 
 module.exports = router;
+

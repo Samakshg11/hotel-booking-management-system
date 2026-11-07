@@ -16,3 +16,4 @@ In accordance with Algions AI Labs evaluation standards:
    - SHA-256 payload hashing combined with `{ key: 1, userId: 1 }` unique indexing to prevent duplicate billing and race conditions.
 4. **Server-Side Authorization**:
    - JWT tokens with strict server-side RBAC middleware (`guest`, `staff`, `admin`).
+
