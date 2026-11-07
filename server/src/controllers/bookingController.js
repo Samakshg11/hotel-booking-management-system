@@ -31,3 +31,4 @@ async function holdBooking(req, res, next) {
 module.exports = {
   holdBooking,
 };
+

@@ -18,3 +18,4 @@ const availabilityQuerySchema = z.object({
 router.get('/', validate({ query: availabilityQuerySchema }), availabilityController.getAvailability);
 
 module.exports = router;
+

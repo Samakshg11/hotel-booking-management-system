@@ -163,3 +163,4 @@ async function holdBooking({ guestId, roomTypeId, checkIn, checkOut, guests, gue
 module.exports = {
   holdBooking,
 };
+

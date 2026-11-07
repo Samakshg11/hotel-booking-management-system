@@ -92,7 +92,7 @@ Per assessment Rule 6 (*"If a requirement is ambiguous, choose the simplest safe
   - Modular directory layout, Docker Compose replica set (`rs0`), `.env.example`.
   - Mongoose models with validation & declared compound indexes.
   - JWT auth, server-side RBAC, centralized error handling, and test harness (`MongoMemoryReplSet`).
-- [ ] **Phase 2: Room Catalog, Rates & The Unique-Index Concurrency Engine**
+- [x] **Phase 2: Room Catalog, Rates & The Unique-Index Concurrency Engine**
   - Room type and room management.
   - Real-time availability search with pagination.
   - Atomic room hold with transaction fallback on duplicate key collision.

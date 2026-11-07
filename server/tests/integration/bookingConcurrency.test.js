@@ -200,3 +200,4 @@ describe('The Unique-Index Trick & Booking Hold Concurrency Tests', () => {
     expect(res.body.error).toHaveProperty('code', 'PROHIBITED_CHARACTERS');
   });
 });
+

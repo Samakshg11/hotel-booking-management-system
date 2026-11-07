@@ -28,3 +28,4 @@ async function getAvailability(req, res, next) {
 module.exports = {
   getAvailability,
 };
+

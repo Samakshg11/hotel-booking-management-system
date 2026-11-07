@@ -17,28 +17,28 @@ const { BadRequestError } = require('../utils/errors');
  */
 function validateBookingDates(checkIn, checkOut, guests = 1) {
   if (!isValidDateString(checkIn)) {
-    throw new BadRequestError('Invalid checkIn date format. Must be YYYY-MM-DD');
+    throw new BadRequestError('Invalid checkIn date format. Must be YYYY-MM-DD', null, 'VALIDATION_ERROR');
   }
   if (!isValidDateString(checkOut)) {
-    throw new BadRequestError('Invalid checkOut date format. Must be YYYY-MM-DD');
+    throw new BadRequestError('Invalid checkOut date format. Must be YYYY-MM-DD', null, 'VALIDATION_ERROR');
   }
 
   const todayStr = getTodayUtcString();
   if (checkIn < todayStr) {
-    throw new BadRequestError(`checkIn date must be today (${todayStr}) or later`);
+    throw new BadRequestError(`checkIn date must be today (${todayStr}) or later`, null, 'VALIDATION_ERROR');
   }
 
   const nights = calculateNights(checkIn, checkOut);
   if (nights <= 0) {
-    throw new BadRequestError('checkOut date must be strictly after checkIn date');
+    throw new BadRequestError('checkOut date must be strictly after checkIn date', null, 'VALIDATION_ERROR');
   }
 
   if (nights > 30) {
-    throw new BadRequestError('Maximum stay duration cannot exceed 30 nights');
+    throw new BadRequestError('Maximum stay duration cannot exceed 30 nights', null, 'VALIDATION_ERROR');
   }
 
   if (!guests || guests < 1) {
-    throw new BadRequestError('guests count must be at least 1');
+    throw new BadRequestError('guests count must be at least 1', null, 'VALIDATION_ERROR');
   }
 
   return { nights };

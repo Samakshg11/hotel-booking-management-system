@@ -24,3 +24,4 @@ const holdSchema = z.object({
 router.post('/hold', authenticate, validate({ body: holdSchema }), bookingController.holdBooking);
 
 module.exports = router;
+

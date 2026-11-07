@@ -36,3 +36,4 @@ async function calculateStayPricing(roomType, checkIn, checkOut) {
 module.exports = {
   calculateStayPricing,
 };
+
