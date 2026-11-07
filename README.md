@@ -104,7 +104,7 @@ Per assessment Rule 6 (*"If a requirement is ambiguous, choose the simplest safe
   - Check-in / check-out workflows with auto-room status update.
   - Aggregation pipeline for Revenue and Occupancy.
   - Append-only audit trail.
-- [ ] **Phase 5: React + Vite + Tailwind Client with Role Switcher**
+- [x] **Phase 5: React + Vite + Tailwind Client with Role Switcher**
   - 1-click role switcher between Demo Guest, Staff, and Admin.
   - Responsive booking flow, front desk board, and admin KPI dashboard.
 - [ ] **Phase 6: CI/CD, Documentation, and Interview Defense**
