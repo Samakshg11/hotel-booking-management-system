@@ -18,6 +18,10 @@ const roomTypeRoutes = require('./routes/roomTypeRoutes');
 const roomRoutes = require('./routes/roomRoutes');
 const availabilityRoutes = require('./routes/availabilityRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
+const guestRoutes = require('./routes/guestRoutes');
+const reportRoutes = require('./routes/reportRoutes');
+const auditRoutes = require('./routes/auditRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 

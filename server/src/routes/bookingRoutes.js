@@ -1,8 +1,10 @@
 const express = require('express');
 const { z } = require('zod');
 const bookingController = require('../controllers/bookingController');
+const frontDeskController = require('../controllers/frontDeskController');
 const validate = require('../middleware/validate');
 const authenticate = require('../middleware/authenticate');
+const authorize = require('../middleware/authorize');
 const idempotency = require('../middleware/idempotency');
 
 const router = express.Router();
@@ -29,6 +31,15 @@ const cancelSchema = z.object({
   reason: z.string().optional(),
 });
 
+// GET /api/v1/bookings (Staff & Admin: filter by status, date range, reference, guest email; paginated)
+router.get('/', authenticate, authorize('staff', 'admin'), frontDeskController.listBookings);
+
+// GET /api/v1/bookings/mine (Guest history)
+router.get('/mine', authenticate, bookingController.getMyBookings);
+
+// GET /api/v1/bookings/:id (Caller must own booking, or be staff/admin)
+router.get('/:id', authenticate, bookingController.getBookingById);
+
 // POST /api/v1/bookings/hold (Authenticated: guest, staff, admin)
 router.post('/hold', authenticate, validate({ body: holdSchema }), bookingController.holdBooking);
 
@@ -49,10 +60,10 @@ router.post(
   bookingController.cancelBooking
 );
 
-// GET /api/v1/bookings/mine (Guest history)
-router.get('/mine', authenticate, bookingController.getMyBookings);
+// POST /api/v1/bookings/:id/check-in (Staff & Admin only)
+router.post('/:id/check-in', authenticate, authorize('staff', 'admin'), frontDeskController.checkIn);
 
-// GET /api/v1/bookings/:id (Caller must own booking, or be staff/admin)
-router.get('/:id', authenticate, bookingController.getBookingById);
+// POST /api/v1/bookings/:id/check-out (Staff & Admin only)
+router.post('/:id/check-out', authenticate, authorize('staff', 'admin'), frontDeskController.checkOut);
 
 module.exports = router;
