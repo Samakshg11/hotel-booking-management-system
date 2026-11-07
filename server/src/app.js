@@ -10,9 +10,14 @@ const env = require('./config/env');
 const logger = require('./config/logger');
 const errorHandler = require('./middleware/errorHandler');
 const { apiLimiter } = require('./middleware/rateLimit');
+const sanitizeMongo = require('./middleware/sanitizeMongo');
 
 // Route imports
 const authRoutes = require('./routes/authRoutes');
+const roomTypeRoutes = require('./routes/roomTypeRoutes');
+const roomRoutes = require('./routes/roomRoutes');
+const availabilityRoutes = require('./routes/availabilityRoutes');
+const bookingRoutes = require('./routes/bookingRoutes');
 
 const app = express();
 
@@ -31,6 +36,9 @@ app.use(
 
 // Body parser
 app.use(express.json({ limit: '1mb' }));
+
+// Sanitize MongoDB operators ($ and .)
+app.use(sanitizeMongo);
 
 // Logging middleware
 if (env.NODE_ENV !== 'test') {
@@ -62,6 +70,10 @@ app.get('/api/v1/health', (req, res) => {
 
 // Mount Routes under /api/v1
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/room-types', roomTypeRoutes);
+app.use('/api/v1/rooms', roomRoutes);
+app.use('/api/v1/availability', availabilityRoutes);
+app.use('/api/v1/bookings', bookingRoutes);
 
 // Fallback for unmatched routes
 app.use('*', (req, res, next) => {
