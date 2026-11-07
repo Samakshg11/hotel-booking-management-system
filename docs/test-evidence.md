@@ -6,7 +6,7 @@ All tests run against `mongodb-memory-server` with `MongoMemoryReplSet` to valid
 ---
 
 ## Phase 1: Authentication & Server-Side RBAC
-- **Suite**: `server/tests/integration/auth.test.js`
+- **Suite**: `server/tests/integration/auth.test.js` (8 tests)
 - **Scenarios Tested**:
   1. `POST /api/v1/auth/register`:
      - Creates guest user with hashed password (bcrypt cost 10).
@@ -24,8 +24,8 @@ All tests run against `mongodb-memory-server` with `MongoMemoryReplSet` to valid
 
 ## Phase 2: Room Catalog, Real-Time Availability & The Unique-Index Concurrency Engine
 - **Suites**:
-  - `server/tests/integration/roomsAndAvailability.test.js`
-  - `server/tests/integration/bookingConcurrency.test.js`
+  - `server/tests/integration/roomsAndAvailability.test.js` (7 tests)
+  - `server/tests/integration/bookingConcurrency.test.js` (5 tests)
 - **Scenarios Tested**:
   1. **Room & Room Type Catalog (RBAC)**:
      - Public can list room types (`GET /api/v1/room-types`).
@@ -36,7 +36,7 @@ All tests run against `mongodb-memory-server` with `MongoMemoryReplSet` to valid
      - Calculates live available count filtering out occupied dates and maintenance rooms.
      - Computes itemized pricing breakdown (nightly rates in paise, 12% tax, total).
      - Rejects invalid dates (`checkOut <= checkIn`, past dates, > 30 nights).
-  3. **The Unique-Index Trick & Concurrency Concurrency Safety**:
+  3. **The Unique-Index Trick & Concurrency Safety**:
      - `POST /api/v1/bookings/hold` creates hold with format `HB-<YYYYMMDD>-<5 char base32>` and inserts `roomNights` with `{ roomId, date }` unique index.
      - Two concurrent requests for the same room type and dates: both succeed atomically by claiming distinct rooms (201 and 202).
      - Third request with exhausted inventory is rejected with `409 NO_AVAILABILITY`.
@@ -47,7 +47,7 @@ All tests run against `mongodb-memory-server` with `MongoMemoryReplSet` to valid
 ---
 
 ## Phase 3: Booking State Machine, Idempotent Payments & Cancellations
-- **Suite**: `server/tests/integration/bookingStateMachineAndPayment.test.js`
+- **Suite**: `server/tests/integration/bookingStateMachineAndPayment.test.js` (9 tests)
 - **Scenarios Tested**:
   1. **State Machine & Confirm with Simulated Payment**:
      - Confirms an active `HELD` booking inside a multi-document transaction: updates nights to `CONFIRMED`, unsets `expiresAt`, generates payment receipt.
@@ -67,38 +67,31 @@ All tests run against `mongodb-memory-server` with `MongoMemoryReplSet` to valid
 
 ---
 
-## Full Test Execution Output
+## Phase 4: Front Desk Housekeeping Board, Admin Reports & Audit Logs
+- **Suite**: `server/tests/integration/frontDeskAndReports.test.js` (8 tests)
+- **Scenarios Tested**:
+  1. **Front Desk Check-In & Check-Out Workflows**:
+     - Staff checks in a `CONFIRMED` booking on arrival date -> status transitions to `CHECKED_IN`, audit log recorded.
+     - Rejects early check-in before arrival date with `400 EARLY_CHECKIN_PROHIBITED`.
+     - Staff checks out a `CHECKED_IN` booking -> status transitions to `CHECKED_OUT`, audit log recorded.
+     - Rejects non-staff/guest from calling front-desk check-in/out endpoints with `403 FORBIDDEN`.
+  2. **Guest Directory (Staff & Admin)**:
+     - Search guests by name/email/phone with pagination (`GET /api/v1/guests`).
+     - View detailed guest profile with populated stay history (`GET /api/v1/guests/:id`).
+  3. **Reports Reconciliation & Analytics Pipeline (Admin)**:
+     - `GET /api/v1/reports/summary?from&to` reconciles revenue, occupancy percentage, and status counts 100% against raw bookings.
+     - Queries daily arrivals (`GET /reports/arrivals`) and departures (`GET /reports/departures`).
+  4. **Audit Trail & Role Management (Admin)**:
+     - Admin can inspect append-only audit trail (`GET /api/v1/audit-logs`).
+     - Admin can promote/change user roles (`PATCH /api/v1/admin/users/:id/role`), automatically writing an audit log.
+
+---
+
+## Full Test Execution Summary
 ```
-PASS tests/integration/bookingStateMachineAndPayment.test.js
-  Booking State Machine, Idempotent Payments & Cancellations Tests
-    Confirm Booking & Deterministic Payments
-      ✓ should confirm a held booking, persist payment and unset expiresAt on roomNights (966 ms)
-      ✓ should decline payment for card ending in 0000, leaving booking in HELD status (423 ms)
-      ✓ should reject confirming an expired hold with 410 HOLD_EXPIRED and release room nights (440 ms)
-    Idempotency Key Verification
-      ✓ should return identical cached response on duplicate request and reject modified payload with 422 (451 ms)
-    Cancellation & Refund Policy
-      ✓ should cancel HELD booking, delete room nights and make room rebookable (475 ms)
-      ✓ should give full refund when cancelling CONFIRMED booking more than 24h before check-in (474 ms)
-      ✓ should retain first night when cancelling CONFIRMED booking within 24h of check-in (522 ms)
-    Authorization & Ownership Guards
-      ✓ should prevent Guest B from confirming or reading Guest A booking (427 ms)
-      ✓ should list only own bookings in GET /api/v1/bookings/mine (425 ms)
-
-PASS tests/integration/roomsAndAvailability.test.js
-  Rooms & Availability Integration Tests
-    ✓ 7 room and availability tests passed
-
-PASS tests/integration/bookingConcurrency.test.js
-  The Unique-Index Trick & Booking Hold Concurrency Tests
-    ✓ 5 concurrency and duplicate key tests passed
-
-PASS tests/integration/auth.test.js
-  Auth & RBAC Integration Tests
-    ✓ 8 auth and token validation tests passed
-
-Test Suites: 4 passed, 4 total
-Tests:       29 passed, 29 total
+Test Suites: 5 passed, 5 total
+Tests:       37 passed, 37 total
 Snapshots:   0 total
-Time:        21.606 s
+Time:        27.55 s
+Ran all test suites in band.
 ```

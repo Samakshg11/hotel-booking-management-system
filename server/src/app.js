@@ -78,6 +78,10 @@ app.use('/api/v1/room-types', roomTypeRoutes);
 app.use('/api/v1/rooms', roomRoutes);
 app.use('/api/v1/availability', availabilityRoutes);
 app.use('/api/v1/bookings', bookingRoutes);
+app.use('/api/v1/guests', guestRoutes);
+app.use('/api/v1/reports', reportRoutes);
+app.use('/api/v1/audit-logs', auditRoutes);
+app.use('/api/v1/admin', adminRoutes);
 
 // Fallback for unmatched routes
 app.use('*', (req, res, next) => {

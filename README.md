@@ -100,7 +100,7 @@ Per assessment Rule 6 (*"If a requirement is ambiguous, choose the simplest safe
   - Deterministic simulated card payment.
   - Idempotency middleware & cache lookup.
   - Cancellation with 24-hour refund window policy.
-- [ ] **Phase 4: Front Desk Housekeeping Board, Admin Reports & Audit Logs**
+- [x] **Phase 4: Front Desk Housekeeping Board, Admin Reports & Audit Logs**
   - Check-in / check-out workflows with auto-room status update.
   - Aggregation pipeline for Revenue and Occupancy.
   - Append-only audit trail.
