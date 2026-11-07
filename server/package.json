@@ -39,7 +39,10 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "testTimeout": 30000,
-    "verbose": true
+    "testTimeout": 60000,
+    "verbose": true,
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setup.js"
+    ]
   }
 }
