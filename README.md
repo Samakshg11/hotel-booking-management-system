@@ -107,8 +107,8 @@ Per assessment Rule 6 (*"If a requirement is ambiguous, choose the simplest safe
 - [x] **Phase 5: React + Vite + Tailwind Client with Role Switcher**
   - 1-click role switcher between Demo Guest, Staff, and Admin.
   - Responsive booking flow, front desk board, and admin KPI dashboard.
-- [ ] **Phase 6: CI/CD, Documentation, and Interview Defense**
-  - GitHub Actions workflow, complete OpenAPI docs, `docs/EXPLAIN.md`.
+- [x] **Phase 6: CI/CD, Documentation, and Interview Defense**
+  - GitHub Actions workflow, complete OpenAPI docs (`/api/docs`), `docs/EXPLAIN.md`, `docs/REPORT.md`, `docs/ER.md`, `docs/DEMO_SCRIPT.md`, and `docs/test-evidence.md`.
 
 ---
 
@@ -122,24 +122,36 @@ Per assessment Rule 6 (*"If a requirement is ambiguous, choose the simplest safe
 ```bash
 docker compose up -d
 ```
+*(Or run `docker compose up --build` to run Mongo, Server, and Client all in containers).*
 
-### 2. Install & Seed
+### 2. Backend Setup & Seed
 ```bash
-# In server directory
 cd server
 npm install
 npm run seed
+npm run dev
+# Server running at http://localhost:5000
+# Swagger API Docs at http://localhost:5000/api/docs
+```
+
+### 3. Frontend Setup
+```bash
+cd ../client
+npm install
+npm run dev
+# Web application running at http://localhost:5173
 ```
 
 ### Demo Accounts
-| Role | Email | Password |
+*(Also switchable via the persistent 1-click Demo Switcher banner at the top of the frontend!)*
+| Role | Email (Primary & Alternate) | Password |
 |---|---|---|
-| **Guest** | `guest@hotel.com` | `Password123!` |
-| **Staff** | `staff@hotel.com` | `Password123!` |
-| **Admin** | `admin@hotel.com` | `Password123!` |
+| **Guest** | `guest@demo.test` / `guest@hotel.com` | `Password123!` |
+| **Staff** | `staff@demo.test` / `staff@hotel.com` | `Password123!` |
+| **Admin** | `admin@demo.test` / `admin@hotel.com` | `Password123!` |
 
-### 3. Run Tests
+### 4. Run Automated Test Suite
 ```bash
 cd server
-npm test
+npm test -- --coverage
 ```

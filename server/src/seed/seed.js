@@ -66,6 +66,27 @@ async function seed() {
       role: 'admin',
       phone: '+91 98765 43212',
     },
+    {
+      name: 'Demo Guest Alternate',
+      email: 'guest@hotel.com',
+      passwordHash,
+      role: 'guest',
+      phone: '+91 98765 43213',
+    },
+    {
+      name: 'Front Desk Staff Alternate',
+      email: 'staff@hotel.com',
+      passwordHash,
+      role: 'staff',
+      phone: '+91 98765 43214',
+    },
+    {
+      name: 'System Administrator Alternate',
+      email: 'admin@hotel.com',
+      passwordHash,
+      role: 'admin',
+      phone: '+91 98765 43215',
+    },
   ]);
 
   logger.info('Creating 4 Room Types (Standard, Deluxe, Family Suite, Presidential)...');
