@@ -3,6 +3,7 @@ const { z } = require('zod');
 const bookingController = require('../controllers/bookingController');
 const validate = require('../middleware/validate');
 const authenticate = require('../middleware/authenticate');
+const idempotency = require('../middleware/idempotency');
 
 const router = express.Router();
 
@@ -20,8 +21,38 @@ const holdSchema = z.object({
     .optional(),
 });
 
+const confirmSchema = z.object({
+  cardNumber: z.string().min(4, 'Card number is required'),
+});
+
+const cancelSchema = z.object({
+  reason: z.string().optional(),
+});
+
 // POST /api/v1/bookings/hold (Authenticated: guest, staff, admin)
 router.post('/hold', authenticate, validate({ body: holdSchema }), bookingController.holdBooking);
 
-module.exports = router;
+// POST /api/v1/bookings/:id/confirm (Requires Idempotency-Key header)
+router.post(
+  '/:id/confirm',
+  authenticate,
+  idempotency(true),
+  validate({ body: confirmSchema }),
+  bookingController.confirmBooking
+);
 
+// POST /api/v1/bookings/:id/cancel
+router.post(
+  '/:id/cancel',
+  authenticate,
+  validate({ body: cancelSchema }),
+  bookingController.cancelBooking
+);
+
+// GET /api/v1/bookings/mine (Guest history)
+router.get('/mine', authenticate, bookingController.getMyBookings);
+
+// GET /api/v1/bookings/:id (Caller must own booking, or be staff/admin)
+router.get('/:id', authenticate, bookingController.getBookingById);
+
+module.exports = router;
