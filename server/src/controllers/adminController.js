@@ -45,3 +45,4 @@ async function updateUserRole(req, res, next) {
 module.exports = {
   updateUserRole,
 };
+

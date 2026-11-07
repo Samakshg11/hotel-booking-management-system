@@ -53,3 +53,4 @@ module.exports = {
   checkOut,
   listBookings,
 };
+

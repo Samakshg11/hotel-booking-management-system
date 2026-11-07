@@ -25,3 +25,4 @@ async function processSimulatedPayment({ bookingReference, amount, cardNumber })
 module.exports = {
   processSimulatedPayment,
 };
+

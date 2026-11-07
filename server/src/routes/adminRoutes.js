@@ -17,3 +17,4 @@ const roleSchema = z.object({
 router.patch('/users/:id/role', validate({ body: roleSchema }), adminController.updateUserRole);
 
 module.exports = router;
+

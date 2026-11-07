@@ -31,3 +31,4 @@ async function listAuditLogs({ entityType, entityId, actorId, page = 1, limit = 
 module.exports = {
   listAuditLogs,
 };
+

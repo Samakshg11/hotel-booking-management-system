@@ -12,3 +12,4 @@ router.use(authenticate, authorize('admin'));
 router.get('/', auditController.getAuditLogs);
 
 module.exports = router;
+

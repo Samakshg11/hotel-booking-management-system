@@ -15,3 +15,4 @@ router.get('/', guestController.getGuests);
 router.get('/:id', guestController.getGuestById);
 
 module.exports = router;
+

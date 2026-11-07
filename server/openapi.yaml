@@ -1,10 +1,16 @@
 openapi: 3.0.3
 info:
-  title: Hotel Management System API
+  title: Grand Horizon Hotel Management API
   description: >
-    Production-grade Hotel Management API built for Algions AI Labs take-home assessment.
-    Enforces server-side RBAC, transaction-safe bookings with the unique-index concurrency pattern,
-    idempotent simulated payments, and audit logs.
+    Production-ready modular monolith API built for the Algions AI Labs take-home assessment.
+    Features:
+    - Server-side RBAC (guest, staff, admin)
+    - Zero double-booking concurrency engine via MongoDB compound unique index { roomId: 1, date: 1 }
+    - Multi-document ACID transactions
+    - Deterministic payment simulation with Idempotency-Key protection
+    - Centralized State Machine (TRANSITIONS)
+    - Reconciled Financial & Occupancy Aggregation Pipelines
+    - Append-only audit logging
   version: 1.0.0
 servers:
   - url: /api/v1
@@ -17,21 +23,6 @@ paths:
       responses:
         '200':
           description: Service is healthy
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: object
-                    properties:
-                      status:
-                        type: string
-                        example: UP
-                      timestamp:
-                        type: string
-                      uptime:
-                        type: number
 
   /auth/register:
     post:
@@ -42,32 +33,16 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-                - name
-                - email
-                - password
+              required: [name, email, password]
               properties:
-                name:
-                  type: string
-                  example: Jane Doe
-                email:
-                  type: string
-                  format: email
-                  example: jane@example.com
-                password:
-                  type: string
-                  format: password
-                  example: Secret123!
-                phone:
-                  type: string
-                  example: '+91 98765 43210'
+                name: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 6 }
+                phone: { type: string }
       responses:
-        '201':
-          description: Guest registered successfully
-        '400':
-          description: Validation error
-        '409':
-          description: Email already registered
+        '201': { description: Guest registered successfully }
+        '400': { description: Validation error }
+        '409': { description: Email already taken }
 
   /auth/login:
     post:
@@ -78,34 +53,318 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-                - email
-                - password
+              required: [email, password]
               properties:
-                email:
-                  type: string
-                  format: email
-                  example: guest@hotel.com
-                password:
-                  type: string
-                  format: password
-                  example: Password123!
+                email: { type: string, format: email }
+                password: { type: string }
       responses:
-        '200':
-          description: Login successful with JWT token
-        '401':
-          description: Invalid email or password
+        '200': { description: Login successful with JWT token }
+        '401': { description: Invalid credentials }
 
   /auth/me:
     get:
-      summary: Get authenticated user profile
+      summary: Get current authenticated user profile
       security:
         - BearerAuth: []
       responses:
-        '200':
-          description: Current user profile
-        '401':
-          description: Unauthenticated
+        '200': { description: User profile }
+        '401': { description: Unauthenticated }
+
+  /room-types:
+    get:
+      summary: List all active room types (Public)
+      responses:
+        '200': { description: List of room types }
+    post:
+      summary: Create new room type (Admin only)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, capacity, baseRate]
+              properties:
+                name: { type: string }
+                capacity: { type: integer, minimum: 1 }
+                baseRate: { type: integer, minimum: 0, description: "paise" }
+                amenities: { type: array, items: { type: string } }
+      responses:
+        '201': { description: Room type created }
+        '403': { description: Forbidden }
+
+  /rooms:
+    get:
+      summary: List physical rooms (Staff & Admin)
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: List of rooms }
+    post:
+      summary: Create physical room (Admin only)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roomNumber, roomTypeId, floor]
+              properties:
+                roomNumber: { type: string }
+                roomTypeId: { type: string }
+                floor: { type: integer }
+                status: { type: string, enum: [available, maintenance, out_of_service] }
+      responses:
+        '201': { description: Room created }
+
+  /rooms/{id}/status:
+    patch:
+      summary: Update housekeeping/maintenance status (Staff & Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [available, maintenance, out_of_service] }
+      responses:
+        '200': { description: Room status updated }
+
+  /availability:
+    get:
+      summary: Search real-time room availability with pricing breakdown
+      parameters:
+        - in: query
+          name: checkIn
+          required: true
+          schema: { type: string, format: date }
+        - in: query
+          name: checkOut
+          required: true
+          schema: { type: string, format: date }
+        - in: query
+          name: guests
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: roomTypeId
+          schema: { type: string }
+      responses:
+        '200': { description: Available room types and itemized rates }
+        '400': { description: Invalid date or duration }
+
+  /bookings/hold:
+    post:
+      summary: Hold a room atomically with transaction and duplicate-key fallback
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roomTypeId, checkIn, checkOut, guests]
+              properties:
+                roomTypeId: { type: string }
+                checkIn: { type: string, format: date }
+                checkOut: { type: string, format: date }
+                guests: { type: integer, minimum: 1 }
+                guestDetails:
+                  type: object
+                  properties:
+                    fullName: { type: string }
+                    email: { type: string }
+                    phone: { type: string }
+      responses:
+        '201': { description: Hold created with reference HB-YYYYMMDD-XXXXX }
+        '409': { description: No availability for chosen dates }
+
+  /bookings/{id}/confirm:
+    post:
+      summary: Confirm a held reservation with simulated payment (Requires Idempotency-Key)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cardNumber]
+              properties:
+                cardNumber: { type: string, description: "Card ending 0000 declines, others succeed" }
+      responses:
+        '200': { description: Booking confirmed }
+        '400': { description: Payment declined }
+        '410': { description: Hold expired }
+        '422': { description: Idempotency key reused with different payload }
+
+  /bookings/{id}/cancel:
+    post:
+      summary: Cancel reservation and apply 24h refund policy
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string }
+      responses:
+        '200': { description: Booking cancelled and room released }
+
+  /bookings/mine:
+    get:
+      summary: List guest own booking history
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: Guest booking list }
+
+  /bookings:
+    get:
+      summary: List all bookings with search/filter (Staff & Admin)
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: Filtered bookings list }
+
+  /bookings/{id}/check-in:
+    post:
+      summary: Check in guest on arrival date (Staff & Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Checked in }
+        '400': { description: Early check-in prohibited }
+
+  /bookings/{id}/check-out:
+    post:
+      summary: Check out guest (Staff & Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Checked out }
+
+  /guests:
+    get:
+      summary: Search guest directory (Staff & Admin)
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: Guest directory }
+
+  /guests/{id}:
+    get:
+      summary: View guest profile with full stay history (Staff & Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Guest details with bookings }
+
+  /reports/summary:
+    get:
+      summary: Aggregated financial and occupancy report (Admin only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: Reconciled revenue and occupancy rate }
+
+  /reports/arrivals:
+    get:
+      summary: Expected arrivals (Staff & Admin)
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: Arrivals list }
+
+  /reports/departures:
+    get:
+      summary: Expected departures (Staff & Admin)
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: Departures list }
+
+  /audit-logs:
+    get:
+      summary: Inspect audit log records (Admin only)
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: Audit log records }
+
+  /admin/users/{id}/role:
+    patch:
+      summary: Change user role (Admin only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [guest, staff, admin] }
+      responses:
+        '200': { description: User role updated and logged }
 
 components:
   securitySchemes:
@@ -113,4 +372,3 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-

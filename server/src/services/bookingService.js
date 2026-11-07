@@ -300,3 +300,4 @@ module.exports = {
   getMyBookings,
   getBookingById,
 };
+

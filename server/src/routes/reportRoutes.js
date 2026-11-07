@@ -16,3 +16,4 @@ router.get('/summary', authorize('admin'), reportController.getSummary);
 router.get('/revenue-by-day', authorize('admin'), reportController.getRevenueByDay);
 
 module.exports = router;
+
