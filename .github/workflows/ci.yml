@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Monorepo Dependencies
+        run: |
+          npm ci || npm install
+          cd server && npm ci || npm install
+          cd ../client && npm ci || npm install
+
+      - name: Build Frontend Client
+        run: |
+          cd client && npm run build
+
+      - name: Run Backend Tests (with MongoMemoryReplSet)
+        run: |
+          cd server && npm test -- --coverage
+        env:
+          NODE_ENV: test
+          JWT_SECRET: ci_test_secret_key_minimum_32_characters_length

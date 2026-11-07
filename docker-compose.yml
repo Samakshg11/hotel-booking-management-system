@@ -16,6 +16,38 @@ services:
       retries: 10
       start_period: 3s
 
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: hotel-server
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - MONGODB_URI=mongodb://mongo:27017/hotel_management?replicaSet=rs0
+      - JWT_SECRET=super_secret_jwt_key_for_takehome_demo_only_min_32_characters_long
+      - JWT_EXPIRES_IN=7d
+      - CLIENT_URL=http://localhost:5173
+      - HOLD_MINUTES=10
+      - TAX_RATE=0.12
+      - ALLOW_EARLY_CHECKIN=false
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: hotel-client
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:5000/api/v1
+    depends_on:
+      - server
+
 volumes:
   mongo-data:
-
