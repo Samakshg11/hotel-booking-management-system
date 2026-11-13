@@ -24,10 +24,11 @@ export default function StaffDashboardPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [actionError, setActionError] = useState(null);
 
-  // Fetch Rooms for the Room Status Board
+  // Fetch Rooms for the Room Status Board only when board tab is opened
   const { data: roomsData, isLoading: roomsLoading } = useQuery({
     queryKey: ['staff-rooms'],
     queryFn: () => api.get('/rooms'),
+    enabled: activeTab === 'board',
   });
 
   // Fetch Bookings with unified search across guest name, email, or reference

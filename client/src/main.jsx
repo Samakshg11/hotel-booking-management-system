@@ -10,6 +10,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
+      staleTime: 1000 * 30, // 30s cache so navigation and tab clicks feel instantaneous
       retry: 1,
     },
   },

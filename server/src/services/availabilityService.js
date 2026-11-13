@@ -105,34 +105,36 @@ async function searchAvailability({ checkIn, checkOut, guests = 1, roomTypeId = 
     .limit(limit)
     .lean();
 
-  const results = [];
+  const results = await Promise.all(
+    roomTypes.map(async (rt) => {
+      const [availableRooms, pricing] = await Promise.all([
+        findAvailableRoomsForType(rt._id, checkIn, checkOut),
+        calculateStayPricing(rt, checkIn, checkOut),
+      ]);
 
-  for (const rt of roomTypes) {
-    const availableRooms = await findAvailableRoomsForType(rt._id, checkIn, checkOut);
-    const pricing = await calculateStayPricing(rt, checkIn, checkOut);
-
-    results.push({
-      roomType: {
-        id: rt._id,
-        name: rt.name,
-        description: rt.description,
-        capacity: rt.capacity,
-        amenities: rt.amenities,
-        baseRate: rt.baseRate,
-      },
-      availableCount: availableRooms.length,
-      isAvailable: availableRooms.length > 0,
-      pricing: {
-        nightly: pricing.nightly,
-        subtotal: pricing.subtotal,
-        taxRate: pricing.taxRate,
-        tax: pricing.tax,
-        fees: pricing.fees,
-        total: pricing.total,
-        averageNightlyRate: Math.round(pricing.subtotal / pricing.nightly.length),
-      },
-    });
-  }
+      return {
+        roomType: {
+          id: rt._id,
+          name: rt.name,
+          description: rt.description,
+          capacity: rt.capacity,
+          amenities: rt.amenities,
+          baseRate: rt.baseRate,
+        },
+        availableCount: availableRooms.length,
+        isAvailable: availableRooms.length > 0,
+        pricing: {
+          nightly: pricing.nightly,
+          subtotal: pricing.subtotal,
+          taxRate: pricing.taxRate,
+          tax: pricing.tax,
+          fees: pricing.fees,
+          total: pricing.total,
+          averageNightlyRate: Math.round(pricing.subtotal / pricing.nightly.length),
+        },
+      };
+    })
+  );
 
   return {
     data: results,
