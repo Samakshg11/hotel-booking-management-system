@@ -163,26 +163,26 @@ describe('The Unique-Index Trick & Booking Hold Concurrency Tests', () => {
   });
 
   it('should allow same-day turnover (check-out date is NOT an occupied night)', async () => {
-    // Guest 1 books days 10 to 12
+    // Guest 1 books days Dec 10 to Dec 12
     const res1 = await request(app)
       .post('/api/v1/bookings/hold')
       .set('Authorization', `Bearer ${guestToken}`)
       .send({
         roomTypeId: roomType._id.toString(),
-        checkIn: '2026-11-10',
-        checkOut: '2026-11-12',
+        checkIn: '2026-12-10',
+        checkOut: '2026-12-12',
         guests: 1,
       });
     expect(res1.status).toBe(201);
 
-    // Guest 2 books days 12 to 14 (starts on checkOut date of Guest 1)
+    // Guest 2 books days Dec 12 to Dec 14 (starts on checkOut date of Guest 1)
     const res2 = await request(app)
       .post('/api/v1/bookings/hold')
       .set('Authorization', `Bearer ${guest2Token}`)
       .send({
         roomTypeId: roomType._id.toString(),
-        checkIn: '2026-11-12',
-        checkOut: '2026-11-14',
+        checkIn: '2026-12-12',
+        checkOut: '2026-12-14',
         guests: 1,
       });
     expect(res2.status).toBe(201);
@@ -192,12 +192,12 @@ describe('The Unique-Index Trick & Booking Hold Concurrency Tests', () => {
     // Manually create an expired HELD night in DB
     const room = await Room.findOne({ roomNumber: '201' });
     const expiredBooking = await Booking.create({
-      reference: 'HB-20261101-EXP01',
+      reference: 'HB-20261201-EXP01',
       guestId: new (require('mongoose').Types.ObjectId)(),
       roomId: room._id,
       roomTypeId: roomType._id,
-      checkIn: '2026-11-10',
-      checkOut: '2026-11-12',
+      checkIn: '2026-12-20',
+      checkOut: '2026-12-22',
       nights: 2,
       guests: 1,
       status: 'HELD',
@@ -209,21 +209,21 @@ describe('The Unique-Index Trick & Booking Hold Concurrency Tests', () => {
     await RoomNight.create([
       {
         roomId: room._id,
-        date: '2026-11-10',
+        date: '2026-12-20',
         bookingId: expiredBooking._id,
         status: 'HELD',
         expiresAt: new Date(Date.now() - 10 * 60 * 1000),
       },
     ]);
 
-    // Now a new guest tries to hold 2026-11-10 -> expired hold should be cleaned up and succeed
+    // Now a new guest tries to hold 2026-12-20 -> expired hold should be cleaned up and succeed
     const res = await request(app)
       .post('/api/v1/bookings/hold')
       .set('Authorization', `Bearer ${guestToken}`)
       .send({
         roomTypeId: roomType._id.toString(),
-        checkIn: '2026-11-10',
-        checkOut: '2026-11-11',
+        checkIn: '2026-12-20',
+        checkOut: '2026-12-21',
         guests: 1,
       });
 

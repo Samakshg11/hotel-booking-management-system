@@ -272,8 +272,8 @@ describe('Booking State Machine, Idempotent Payments & Cancellations Tests', () 
     });
 
     it('should list only own bookings in GET /api/v1/bookings/mine', async () => {
-      await createTestHold(guestToken, '2026-11-10', '2026-11-12');
-      await createTestHold(guest2Token, '2026-11-15', '2026-11-17');
+      await createTestHold(guestToken, '2026-12-10', '2026-12-12');
+      await createTestHold(guest2Token, '2026-12-15', '2026-12-17');
 
       const res = await request(app)
         .get('/api/v1/bookings/mine')
