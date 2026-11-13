@@ -18,22 +18,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
-      - name: Install Monorepo Dependencies
-        run: |
-          npm ci || npm install
-          cd server && npm ci || npm install
-          cd ../client && npm ci || npm install
+      - name: Install Dependencies
+        run: npm install
 
       - name: Build Frontend Client
-        run: |
-          cd client && npm run build
+        run: npm --prefix client run build
 
-      - name: Run Backend Tests (with MongoMemoryReplSet)
-        run: |
-          cd server && npm test -- --coverage
+      - name: Run Backend Tests
+        run: npm --prefix server test -- --coverage
         env:
           NODE_ENV: test
           JWT_SECRET: ci_test_secret_key_minimum_32_characters_length
-
+          MONGODB_URI: mongodb://127.0.0.1:27017/hotel_test
