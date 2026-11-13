@@ -19,7 +19,7 @@ import {
 export default function StaffDashboardPage() {
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState('board'); // 'board' | 'bookings' | 'arrivals'
+  const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'board'
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [actionError, setActionError] = useState(null);
@@ -30,11 +30,11 @@ export default function StaffDashboardPage() {
     queryFn: () => api.get('/rooms'),
   });
 
-  // Fetch Bookings
+  // Fetch Bookings with unified search across guest name, email, or reference
   const { data: bookingsData, isLoading: bookingsLoading } = useQuery({
     queryKey: ['staff-bookings', searchTerm, statusFilter],
     queryFn: () =>
-      api.get(`/bookings?reference=${searchTerm}&status=${statusFilter}&limit=30`),
+      api.get(`/bookings?search=${encodeURIComponent(searchTerm)}&status=${statusFilter}&limit=50`),
   });
 
   // Fetch Today's Arrivals
@@ -129,6 +129,18 @@ export default function StaffDashboardPage() {
       {/* Tabs */}
       <div className="flex border-b border-slate-200 mb-6 gap-2">
         <button
+          onClick={() => setActiveTab('bookings')}
+          className={`pb-3 px-4 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
+            activeTab === 'bookings'
+              ? 'border-brand-600 text-brand-700'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          Guest Bookings ({bookings.length})
+        </button>
+
+        <button
           onClick={() => setActiveTab('board')}
           className={`pb-3 px-4 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
             activeTab === 'board'
@@ -138,18 +150,6 @@ export default function StaffDashboardPage() {
         >
           <BedDouble className="w-4 h-4" />
           Room Status Board ({rooms.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab('bookings')}
-          className={`pb-3 px-4 text-sm font-bold border-b-2 transition flex items-center gap-2 ${
-            activeTab === 'bookings'
-              ? 'border-brand-600 text-brand-700'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Calendar className="w-4 h-4" />
-          All Bookings ({bookings.length})
         </button>
       </div>
 
@@ -234,21 +234,21 @@ export default function StaffDashboardPage() {
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           {/* Table Filters */}
           <div className="p-4 border-b border-slate-200 bg-slate-50/50 flex flex-wrap gap-4 items-center justify-between">
-            <div className="flex items-center gap-3 flex-1 min-w-[240px]">
+            <div className="flex items-center gap-3 flex-1 min-w-[280px]">
               <Search className="w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search by reference or email..."
+                placeholder="Search by guest name, email, or booking reference..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full text-xs bg-white border border-slate-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-brand-500"
+                className="w-full text-xs bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-brand-500 shadow-sm"
               />
             </div>
 
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="text-xs bg-white border border-slate-300 rounded-xl px-3 py-2 font-medium"
+              className="text-xs bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 font-medium shadow-sm"
             >
               <option value="">All Statuses</option>
               <option value="CONFIRMED">CONFIRMED</option>
@@ -263,66 +263,84 @@ export default function StaffDashboardPage() {
             <table className="w-full text-left text-xs text-slate-600">
               <thead className="bg-slate-50 text-slate-700 font-bold uppercase tracking-wider border-b border-slate-200">
                 <tr>
-                  <th className="px-4 py-3">Reference</th>
-                  <th className="px-4 py-3">Guest</th>
-                  <th className="px-4 py-3">Room</th>
-                  <th className="px-4 py-3">Dates</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-5 py-3.5">Guest</th>
+                  <th className="px-5 py-3.5">Assigned Room</th>
+                  <th className="px-5 py-3.5">Dates</th>
+                  <th className="px-5 py-3.5">Status</th>
+                  <th className="px-5 py-3.5">Reference</th>
+                  <th className="px-5 py-3.5 text-right">Front Desk Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {bookings.map((b) => (
-                  <tr key={b._id} className="hover:bg-slate-50/80 transition">
-                    <td className="px-4 py-3.5 font-mono font-bold text-brand-700">{b.reference}</td>
-                    <td className="px-4 py-3.5">
-                      <div className="font-semibold text-slate-900">{b.guestDetails?.fullName || 'Guest'}</div>
-                      <div className="text-[11px] text-slate-400">{b.guestDetails?.email}</div>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <span className="font-bold text-slate-900">{b.roomId?.roomNumber || 'Assigned'}</span>
-                      <span className="text-[11px] text-slate-400 block">{b.roomTypeId?.name}</span>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      {b.checkIn} → {b.checkOut} ({b.nights}n)
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                          b.status === 'CONFIRMED'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : b.status === 'CHECKED_IN'
-                            ? 'bg-blue-100 text-blue-800'
-                            : b.status === 'CHECKED_OUT'
-                            ? 'bg-slate-200 text-slate-800'
-                            : b.status === 'CANCELLED'
-                            ? 'bg-rose-100 text-rose-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}
-                      >
-                        {b.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-right space-x-2">
-                      {b.status === 'CONFIRMED' && (
-                        <button
-                          onClick={() => checkInMutation.mutate(b._id)}
-                          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[11px] transition"
-                        >
-                          Check In
-                        </button>
-                      )}
-                      {b.status === 'CHECKED_IN' && (
-                        <button
-                          onClick={() => checkOutMutation.mutate(b._id)}
-                          className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-[11px] transition"
-                        >
-                          Check Out
-                        </button>
-                      )}
+                {bookings.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-12 text-slate-400">
+                      No bookings found matching "{searchTerm}".
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  bookings.map((b) => (
+                    <tr key={b._id} className="hover:bg-slate-50/80 transition">
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 font-bold flex items-center justify-center text-xs uppercase flex-shrink-0">
+                            {(b.guestDetails?.fullName || 'G')[0]}
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-900 text-sm">{b.guestDetails?.fullName || 'Guest'}</div>
+                            <div className="text-[11px] text-slate-400">{b.guestDetails?.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className="font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg text-xs">
+                          Room {b.roomId?.roomNumber || 'Assigned'}
+                        </span>
+                        <span className="text-[11px] text-slate-500 block mt-1 font-medium">{b.roomTypeId?.name}</span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className="font-medium text-slate-800">{b.checkIn} → {b.checkOut}</span>
+                        <span className="text-[11px] text-slate-400 block">{b.nights} night{b.nights > 1 ? 's' : ''}</span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider inline-block ${
+                            b.status === 'CONFIRMED'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              : b.status === 'CHECKED_IN'
+                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                              : b.status === 'CHECKED_OUT'
+                              ? 'bg-slate-100 text-slate-700 border border-slate-300'
+                              : b.status === 'CANCELLED'
+                              ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                              : 'bg-amber-100 text-amber-800 border border-amber-200'
+                          }`}
+                        >
+                          {b.status.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 font-mono font-medium text-slate-500 text-xs">{b.reference}</td>
+                      <td className="px-5 py-3.5 text-right space-x-2">
+                        {b.status === 'CONFIRMED' && (
+                          <button
+                            onClick={() => checkInMutation.mutate(b._id)}
+                            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition shadow-sm cursor-pointer"
+                          >
+                            Check In
+                          </button>
+                        )}
+                        {b.status === 'CHECKED_IN' && (
+                          <button
+                            onClick={() => checkOutMutation.mutate(b._id)}
+                            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow-sm cursor-pointer"
+                          >
+                            Check Out
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

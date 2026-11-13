@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import api from '../api/client';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('hms_token'));
   const [loading, setLoading] = useState(true);
@@ -32,6 +34,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('hms_token', res.data.token);
     setToken(res.data.token);
     setUser(res.data.user);
+    queryClient.clear();
     return res.data.user;
   };
 
@@ -40,13 +43,17 @@ export function AuthProvider({ children }) {
     localStorage.setItem('hms_token', res.data.token);
     setToken(res.data.token);
     setUser(res.data.user);
+    queryClient.clear();
     return res.data.user;
   };
 
   const logout = () => {
     localStorage.removeItem('hms_token');
+    // Also clear the cached header so the next request doesn't send the stale token
+    delete api.defaults.headers.common['Authorization'];
     setToken(null);
     setUser(null);
+    queryClient.clear();
   };
 
   // 1-Click Demo Role Switcher for instant interview demonstration

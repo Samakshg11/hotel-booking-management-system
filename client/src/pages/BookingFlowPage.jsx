@@ -31,6 +31,7 @@ export default function BookingFlowPage() {
     data: bookingData,
     isLoading,
     isError,
+    error: queryError,
   } = useQuery({
     queryKey: ['booking', id],
     queryFn: () => api.get(`/bookings/${id}`),
@@ -91,11 +92,25 @@ export default function BookingFlowPage() {
   }
 
   if (isError || !booking) {
+    // Distinguish 403 Forbidden from 404/expired
+    const errObj = queryError || {};
+    const isForbidden = errObj.code === 'FORBIDDEN';
     return (
       <div className="max-w-md mx-auto px-4 py-16 text-center">
         <AlertCircle className="w-12 h-12 text-rose-500 mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-slate-900 mb-2">Reservation Not Found</h2>
-        <p className="text-sm text-slate-600 mb-6">This reservation may have expired or was cancelled.</p>
+        {isForbidden ? (
+          <>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">Access Denied</h2>
+            <p className="text-sm text-slate-600 mb-6">
+              You don't have permission to view this booking. Please ensure you're logged in as the correct account.
+            </p>
+          </>
+        ) : (
+          <>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">Reservation Not Found</h2>
+            <p className="text-sm text-slate-600 mb-6">This reservation may have expired or was cancelled.</p>
+          </>
+        )}
         <Link to="/" className="inline-flex px-4 py-2 bg-brand-600 text-white rounded-xl text-sm font-medium">
           Start New Search
         </Link>

@@ -11,6 +11,7 @@ const Payment = require('../models/Payment');
 const AuditLog = require('../models/AuditLog');
 const IdempotencyKey = require('../models/IdempotencyKey');
 const RateOverride = require('../models/RateOverride');
+const env = require('../config/env');
 const logger = require('../config/logger');
 const { generateBookingReference } = require('../utils/reference');
 const { getStayNights } = require('../utils/dates');
@@ -18,9 +19,19 @@ const { getStayNights } = require('../utils/dates');
 const DEMO_PASSWORD = 'Password123!';
 
 async function seed() {
-  const mongoUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/hotel_management?replicaSet=rs0';
+  const mongoUri = process.env.MONGODB_URI || env.MONGODB_URI || 'mongodb://127.0.0.1:27017/hotel_management?replicaSet=rs0';
   logger.info({ mongoUri }, 'Connecting to MongoDB for seeding...');
-  await mongoose.connect(mongoUri);
+  try {
+    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 });
+  } catch (err) {
+    if (mongoUri.includes('replicaSet=')) {
+      const fallbackUri = mongoUri.replace(/[?&]replicaSet=[^&]+/, '').replace(/\?$/, '');
+      logger.warn(`Replica set 'rs0' not found. Connecting in standalone mode for seed: ${fallbackUri}`);
+      await mongoose.connect(fallbackUri, { serverSelectionTimeoutMS: 5000 });
+    } else {
+      throw err;
+    }
+  }
 
   logger.info('Syncing indexes on all collections...');
   const models = [User, RoomType, Room, RoomNight, Booking, Payment, AuditLog, IdempotencyKey, RateOverride];

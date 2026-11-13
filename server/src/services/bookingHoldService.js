@@ -9,6 +9,7 @@ const { generateBookingReference } = require('../utils/reference');
 const { validateBookingDates, findAvailableRoomsForType } = require('./availabilityService');
 const { calculateStayPricing } = require('./pricingService');
 const { ConflictError, NotFoundError, BadRequestError } = require('../utils/errors');
+const { withTransaction } = require('../utils/transaction');
 const logger = require('../config/logger');
 
 /**
@@ -42,11 +43,10 @@ async function holdBooking({ guestId, roomTypeId, checkIn, checkOut, guests, gue
 
   // 3. Iterate through candidate rooms, attempting transaction insertion
   for (const candidateRoom of candidateRooms) {
-    const session = await mongoose.startSession();
     try {
-      let createdBooking = null;
+      const createdBooking = await withTransaction(async (session) => {
+        const sessionOpts = session ? { session } : {};
 
-      await session.withTransaction(async () => {
         // Step A: For the chosen room, delete expired HELD roomNights in the range
         await RoomNight.deleteMany(
           {
@@ -55,7 +55,7 @@ async function holdBooking({ guestId, roomTypeId, checkIn, checkOut, guests, gue
             status: 'HELD',
             expiresAt: { $lt: now },
           },
-          { session }
+          sessionOpts
         );
 
         // Pre-generate booking ObjectId so roomNights can link directly
@@ -72,7 +72,7 @@ async function holdBooking({ guestId, roomTypeId, checkIn, checkOut, guests, gue
         }));
 
         // The Unique Index Trick: Throws code 11000 if another concurrent request reserved any night
-        await RoomNight.insertMany(roomNightDocs, { session });
+        await RoomNight.insertMany(roomNightDocs, sessionOpts);
 
         // Step C: Create booking with status HELD, price breakdown, reference
         const [booking] = await Booking.create(
@@ -97,7 +97,7 @@ async function holdBooking({ guestId, roomTypeId, checkIn, checkOut, guests, gue
               holdExpiresAt,
             },
           ],
-          { session }
+          sessionOpts
         );
 
         // Step D: Write audit log in the same transaction
@@ -124,21 +124,18 @@ async function holdBooking({ guestId, roomTypeId, checkIn, checkOut, guests, gue
               },
             },
           ],
-          { session }
+          sessionOpts
         );
 
-        createdBooking = booking;
+        return booking;
       });
 
-      await session.endSession();
       logger.info(
         { bookingId: createdBooking._id, reference: createdBooking.reference, roomNumber: candidateRoom.roomNumber },
         'Booking hold created successfully'
       );
       return createdBooking;
     } catch (err) {
-      await session.endSession();
-
       const isDuplicateKey =
         err.code === 11000 ||
         (err.writeErrors && err.writeErrors.some((e) => e.code === 11000));

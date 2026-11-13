@@ -57,6 +57,23 @@ export default function SearchPage() {
 
       navigate(`/booking/${res.data._id}`);
     } catch (err) {
+      // If we get a 401 (stale/invalid token), auto-login as guest and retry once
+      if (err.code === 'UNAUTHORIZED') {
+        try {
+          await switchDemoRole('guest');
+          const res = await api.post('/bookings/hold', {
+            roomTypeId,
+            checkIn,
+            checkOut,
+            guests: Number(guests),
+          });
+          navigate(`/booking/${res.data._id}`);
+          return;
+        } catch (retryErr) {
+          setHoldError(retryErr.message || 'Unable to hold room after re-login. Please try again.');
+          return;
+        }
+      }
       setHoldError(err.message || 'Unable to hold room. Please try another selection.');
     } finally {
       setHoldingId(null);

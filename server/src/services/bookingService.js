@@ -13,6 +13,7 @@ const {
   BadRequestError,
 } = require('../utils/errors');
 const { parseUtcDate } = require('../utils/dates');
+const { withTransaction } = require('../utils/transaction');
 const logger = require('../config/logger');
 
 /**
@@ -22,7 +23,11 @@ function verifyBookingOwnership(booking, userId, userRole) {
   if (['staff', 'admin'].includes(userRole)) {
     return true;
   }
-  if (booking.guestId.toString() !== userId) {
+  // After .populate('guestId'), guestId may be an object with _id, not a raw ObjectId
+  const bookingGuestId = booking.guestId?._id
+    ? booking.guestId._id.toString()
+    : booking.guestId.toString();
+  if (bookingGuestId !== userId) {
     throw new ForbiddenError('You do not have permission to access this booking');
   }
   return true;
@@ -46,32 +51,28 @@ async function confirmBooking({ bookingId, userId, userRole, paymentDetails, ide
 
   // 2. Check hold expiration
   if (booking.status === 'HELD' && booking.holdExpiresAt && booking.holdExpiresAt < now) {
-    // Hold has expired: mark booking EXPIRED and release room nights in a transaction
-    const expireSession = await mongoose.startSession();
-    try {
-      await expireSession.withTransaction(async () => {
-        await RoomNight.deleteMany({ bookingId: booking._id }, { session: expireSession });
-        booking.status = 'EXPIRED';
-        await booking.save({ session: expireSession });
-        await AuditLog.create(
-          [
-            {
-              actorId: userId,
-              actorRole: userRole,
-              action: 'BOOKING_EXPIRE',
-              entityType: 'Booking',
-              entityId: booking._id.toString(),
-              before: { status: 'HELD' },
-              after: { status: 'EXPIRED' },
-              meta: { reason: 'Hold timer expired prior to payment' },
-            },
-          ],
-          { session: expireSession }
-        );
-      });
-    } finally {
-      await expireSession.endSession();
-    }
+    // Hold has expired: mark booking EXPIRED and release room nights
+    await withTransaction(async (session) => {
+      const sessionOpts = session ? { session } : {};
+      await RoomNight.deleteMany({ bookingId: booking._id }, sessionOpts);
+      booking.status = 'EXPIRED';
+      await booking.save(sessionOpts);
+      await AuditLog.create(
+        [
+          {
+            actorId: userId,
+            actorRole: userRole,
+            action: 'BOOKING_EXPIRE',
+            entityType: 'Booking',
+            entityId: booking._id.toString(),
+            before: { status: 'HELD' },
+            after: { status: 'EXPIRED' },
+            meta: { reason: 'Hold timer expired prior to payment' },
+          },
+        ],
+        sessionOpts
+      );
+    });
 
     throw new GoneError('Hold has expired. Please search again and create a new reservation', 'HOLD_EXPIRED');
   }
@@ -95,75 +96,70 @@ async function confirmBooking({ bookingId, userId, userRole, paymentDetails, ide
   });
 
   // 6. Execute atomic transaction to confirm booking, update nights, record payment and audit log
-  const session = await mongoose.startSession();
-  try {
-    let result = null;
+  const result = await withTransaction(async (session) => {
+    const sessionOpts = session ? { session } : {};
 
-    await session.withTransaction(async () => {
-      // Step A: Set room nights to CONFIRMED (unset expiresAt)
-      await RoomNight.updateMany(
-        { bookingId: booking._id },
+    // Step A: Set room nights to CONFIRMED (unset expiresAt)
+    await RoomNight.updateMany(
+      { bookingId: booking._id },
+      {
+        $set: { status: 'CONFIRMED' },
+        $unset: { expiresAt: 1 },
+      },
+      sessionOpts
+    );
+
+    // Step B: Set booking to CONFIRMED
+    booking.status = 'CONFIRMED';
+    if (idempotencyKey) {
+      booking.idempotencyKey = idempotencyKey;
+    }
+    await booking.save(sessionOpts);
+
+    // Step C: Create Payment record
+    const [payment] = await Payment.create(
+      [
         {
-          $set: { status: 'CONFIRMED' },
-          $unset: { expiresAt: 1 },
+          bookingId: booking._id,
+          amount: booking.price.total,
+          status: 'SUCCEEDED',
+          method: 'SANDBOX',
+          providerRef: paymentResult.providerRef,
         },
-        { session }
-      );
+      ],
+      sessionOpts
+    );
 
-      // Step B: Set booking to CONFIRMED
-      booking.status = 'CONFIRMED';
-      if (idempotencyKey) {
-        booking.idempotencyKey = idempotencyKey;
-      }
-      await booking.save({ session });
-
-      // Step C: Create Payment record
-      const [payment] = await Payment.create(
-        [
-          {
-            bookingId: booking._id,
-            amount: booking.price.total,
-            status: 'SUCCEEDED',
-            method: 'SANDBOX',
+    // Step D: Write audit log
+    await AuditLog.create(
+      [
+        {
+          actorId: userId,
+          actorRole: userRole,
+          action: 'BOOKING_CONFIRM',
+          entityType: 'Booking',
+          entityId: booking._id.toString(),
+          before: { status: 'HELD' },
+          after: {
+            status: 'CONFIRMED',
+            paymentId: payment._id,
             providerRef: paymentResult.providerRef,
+            amount: booking.price.total,
           },
-        ],
-        { session }
-      );
+          meta: { idempotencyKey },
+        },
+      ],
+      sessionOpts
+    );
 
-      // Step D: Write audit log
-      await AuditLog.create(
-        [
-          {
-            actorId: userId,
-            actorRole: userRole,
-            action: 'BOOKING_CONFIRM',
-            entityType: 'Booking',
-            entityId: booking._id.toString(),
-            before: { status: 'HELD' },
-            after: {
-              status: 'CONFIRMED',
-              paymentId: payment._id,
-              providerRef: paymentResult.providerRef,
-              amount: booking.price.total,
-            },
-            meta: { idempotencyKey },
-          },
-        ],
-        { session }
-      );
+    return {
+      booking,
+      payment,
+    };
+  });
 
-      result = {
-        booking,
-        payment,
-      };
-    });
-
-    logger.info({ bookingId: booking._id, reference: booking.reference }, 'Booking confirmed successfully');
-    return result;
-  } finally {
-    await session.endSession();
-  }
+  logger.info({ bookingId: booking._id, reference: booking.reference }, 'Booking confirmed successfully');
+  return result;
 }
 
 /**
@@ -185,85 +181,80 @@ async function cancelBooking({ bookingId, userId, userRole, cancellationReason }
   const priorStatus = booking.status;
   const now = new Date();
 
-  const session = await mongoose.startSession();
-  try {
-    let result = null;
+  const result = await withTransaction(async (session) => {
+    const sessionOpts = session ? { session } : {};
 
-    await session.withTransaction(async () => {
-      // 1. Delete all room nights so room is immediately available again
-      await RoomNight.deleteMany({ bookingId: booking._id }, { session });
+    // 1. Delete all room nights so room is immediately available again
+    await RoomNight.deleteMany({ bookingId: booking._id }, sessionOpts);
 
-      let refundDetails = null;
+    let refundDetails = null;
 
-      // 2. If booking was CONFIRMED, calculate refund policy
-      if (priorStatus === 'CONFIRMED') {
-        const checkInDate = parseUtcDate(booking.checkIn);
-        const hoursUntilCheckIn = (checkInDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+    // 2. If booking was CONFIRMED, calculate refund policy
+    if (priorStatus === 'CONFIRMED') {
+      const checkInDate = parseUtcDate(booking.checkIn);
+      const hoursUntilCheckIn = (checkInDate.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-        const existingPayment = await Payment.findOne({
-          bookingId: booking._id,
-          status: 'SUCCEEDED',
-        }).session(session);
+      const existingPayment = await Payment.findOne({
+        bookingId: booking._id,
+        status: 'SUCCEEDED',
+      }).session(session);
 
-        if (existingPayment) {
-          if (hoursUntilCheckIn > 24) {
-            // Full refund
-            existingPayment.status = 'REFUNDED';
-            await existingPayment.save({ session });
-            refundDetails = {
-              refundAmount: existingPayment.amount,
-              retainedAmount: 0,
-              policy: 'FULL_REFUND_GREATER_THAN_24H',
-            };
-          } else {
-            // Retain first night rate; refund remainder
-            const firstNightRate = booking.price.nightly[0]?.rate || 0;
-            const refundAmount = Math.max(0, existingPayment.amount - firstNightRate);
-            existingPayment.status = 'PARTIALLY_REFUNDED';
-            await existingPayment.save({ session });
-            refundDetails = {
-              refundAmount,
-              retainedAmount: firstNightRate,
-              policy: 'PARTIAL_REFUND_WITHIN_24H_FIRST_NIGHT_RETAINED',
-            };
-          }
+      if (existingPayment) {
+        if (hoursUntilCheckIn > 24) {
+          // Full refund
+          existingPayment.status = 'REFUNDED';
+          await existingPayment.save(sessionOpts);
+          refundDetails = {
+            refundAmount: existingPayment.amount,
+            retainedAmount: 0,
+            policy: 'FULL_REFUND_GREATER_THAN_24H',
+          };
+        } else {
+          // Retain first night rate; refund remainder
+          const firstNightRate = booking.price.nightly[0]?.rate || 0;
+          const refundAmount = Math.max(0, existingPayment.amount - firstNightRate);
+          existingPayment.status = 'PARTIALLY_REFUNDED';
+          await existingPayment.save(sessionOpts);
+          refundDetails = {
+            refundAmount,
+            retainedAmount: firstNightRate,
+            policy: 'PARTIAL_REFUND_WITHIN_24H_FIRST_NIGHT_RETAINED',
+          };
         }
       }
+    }
 
-      // 3. Update booking record
-      booking.status = 'CANCELLED';
-      booking.cancelledAt = now;
-      booking.cancellationReason = cancellationReason || 'Cancelled by guest/staff';
-      await booking.save({ session });
+    // 3. Update booking record
+    booking.status = 'CANCELLED';
+    booking.cancelledAt = now;
+    booking.cancellationReason = cancellationReason || 'Cancelled by guest/staff';
+    await booking.save(sessionOpts);
 
-      // 4. Record audit log
-      await AuditLog.create(
-        [
-          {
-            actorId: userId,
-            actorRole: userRole,
-            action: 'BOOKING_CANCEL',
-            entityType: 'Booking',
-            entityId: booking._id.toString(),
-            before: { status: priorStatus },
-            after: { status: 'CANCELLED', cancelledAt: now, refundDetails },
-            meta: { reason: booking.cancellationReason },
-          },
-        ],
-        { session }
-      );
+    // 4. Record audit log
+    await AuditLog.create(
+      [
+        {
+          actorId: userId,
+          actorRole: userRole,
+          action: 'BOOKING_CANCEL',
+          entityType: 'Booking',
+          entityId: booking._id.toString(),
+          before: { status: priorStatus },
+          after: { status: 'CANCELLED', cancelledAt: now, refundDetails },
+          meta: { reason: booking.cancellationReason },
+        },
+      ],
+      sessionOpts
+    );
 
-      result = {
-        booking,
-        refund: refundDetails,
-      };
-    });
+    return {
+      booking,
+      refund: refundDetails,
+    };
+  });
 
-    logger.info({ bookingId: booking._id, reference: booking.reference }, 'Booking cancelled successfully');
-    return result;
-  } finally {
-    await session.endSession();
-  }
+  logger.info({ bookingId: booking._id, reference: booking.reference }, 'Booking cancelled successfully');
+  return result;
 }
 
 /**

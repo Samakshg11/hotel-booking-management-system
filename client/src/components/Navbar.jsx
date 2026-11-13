@@ -23,7 +23,7 @@ export default function Navbar() {
           <span className="text-slate-400">Quick-switch test account:</span>
           <div className="inline-flex rounded-md shadow-sm gap-1">
             <button
-              onClick={() => switchDemoRole('guest')}
+              onClick={() => switchDemoRole('guest').then(() => navigate('/'))}
               className={`px-2 py-0.5 rounded text-[11px] font-medium transition ${
                 role === 'guest' && isAuthenticated
                   ? 'bg-emerald-600 text-white font-semibold'
@@ -33,7 +33,7 @@ export default function Navbar() {
               Guest (guest@demo.test)
             </button>
             <button
-              onClick={() => switchDemoRole('staff')}
+              onClick={() => switchDemoRole('staff').then(() => navigate('/'))}
               className={`px-2 py-0.5 rounded text-[11px] font-medium transition ${
                 role === 'staff'
                   ? 'bg-blue-600 text-white font-semibold'
@@ -43,7 +43,7 @@ export default function Navbar() {
               Staff (staff@demo.test)
             </button>
             <button
-              onClick={() => switchDemoRole('admin')}
+              onClick={() => switchDemoRole('admin').then(() => navigate('/'))}
               className={`px-2 py-0.5 rounded text-[11px] font-medium transition ${
                 role === 'admin'
                   ? 'bg-purple-600 text-white font-semibold'

@@ -5,7 +5,7 @@ const logger = require('./config/logger');
 
 async function startServer() {
   try {
-    await connectDB();
+    await connectDB(env.MONGODB_URI);
 
     const server = app.listen(env.PORT, () => {
       logger.info(`Server running in ${env.NODE_ENV} mode on port ${env.PORT}`);

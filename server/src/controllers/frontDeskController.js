@@ -32,15 +32,16 @@ async function checkOut(req, res, next) {
 
 async function listBookings(req, res, next) {
   try {
-    const { status, from, to, reference, guestEmail, page, limit } = req.query;
+    const { status, from, to, reference, guestEmail, search, page, limit } = req.query;
     const result = await frontDeskService.listAllBookings({
       status,
       fromDate: from,
       toDate: to,
       reference,
       guestEmail,
+      search: search || reference,
       page: page ? Number(page) : 1,
-      limit: limit ? Number(limit) : 10,
+      limit: limit ? Number(limit) : 20,
     });
     res.status(200).json({ data: result.data, meta: result.meta });
   } catch (error) {

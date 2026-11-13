@@ -130,8 +130,8 @@ cd server
 npm install
 npm run seed
 npm run dev
-# Server running at http://localhost:5000
-# Swagger API Docs at http://localhost:5000/api/docs
+# Server running at http://localhost:5001
+# Swagger API Docs at http://localhost:5001/api/docs
 ```
 
 ### 3. Frontend Setup

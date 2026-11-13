@@ -7,6 +7,7 @@ const { validateBookingTransition } = require('./bookingStateMachine');
 const { getTodayUtcString } = require('../utils/dates');
 const env = require('../config/env');
 const { BadRequestError, NotFoundError } = require('../utils/errors');
+const { withTransaction } = require('../utils/transaction');
 
 /**
  * Check-in operation (Staff / Admin only)
@@ -31,39 +32,34 @@ async function checkInGuest({ bookingId, actorId, actorRole }) {
     );
   }
 
-  const session = await mongoose.startSession();
-  try {
-    let result = null;
+  const result = await withTransaction(async (session) => {
+    const sessionOpts = session ? { session } : {};
 
-    await session.withTransaction(async () => {
-      // 1. Transition booking to CHECKED_IN
-      booking.status = 'CHECKED_IN';
-      await booking.save({ session });
+    // 1. Transition booking to CHECKED_IN
+    booking.status = 'CHECKED_IN';
+    await booking.save(sessionOpts);
 
-      // 2. Write audit log
-      await AuditLog.create(
-        [
-          {
-            actorId,
-            actorRole,
-            action: 'BOOKING_CHECK_IN',
-            entityType: 'Booking',
-            entityId: booking._id.toString(),
-            before: { status: 'CONFIRMED' },
-            after: { status: 'CHECKED_IN', checkedInAt: new Date() },
-            meta: { roomNumber: booking.roomId?.roomNumber },
-          },
-        ],
-        { session }
-      );
+    // 2. Write audit log
+    await AuditLog.create(
+      [
+        {
+          actorId,
+          actorRole,
+          action: 'BOOKING_CHECK_IN',
+          entityType: 'Booking',
+          entityId: booking._id.toString(),
+          before: { status: 'CONFIRMED' },
+          after: { status: 'CHECKED_IN', checkedInAt: new Date() },
+          meta: { roomNumber: booking.roomId?.roomNumber },
+        },
+      ],
+      sessionOpts
+    );
 
-      result = booking;
-    });
+    return booking;
+  });
 
-    return result;
-  } finally {
-    await session.endSession();
-  }
+  return result;
 }
 
 /**
@@ -79,50 +75,55 @@ async function checkOutGuest({ bookingId, actorId, actorRole }) {
   // Validate state machine: CHECKED_IN -> CHECKED_OUT
   validateBookingTransition(booking.status, 'CHECKED_OUT');
 
-  const session = await mongoose.startSession();
-  try {
-    let result = null;
+  const result = await withTransaction(async (session) => {
+    const sessionOpts = session ? { session } : {};
 
-    await session.withTransaction(async () => {
-      // 1. Transition booking to CHECKED_OUT
-      booking.status = 'CHECKED_OUT';
-      await booking.save({ session });
+    // 1. Transition booking to CHECKED_OUT
+    booking.status = 'CHECKED_OUT';
+    await booking.save(sessionOpts);
 
-      // 2. Write audit log
-      await AuditLog.create(
-        [
-          {
-            actorId,
-            actorRole,
-            action: 'BOOKING_CHECK_OUT',
-            entityType: 'Booking',
-            entityId: booking._id.toString(),
-            before: { status: 'CHECKED_IN' },
-            after: { status: 'CHECKED_OUT', checkedOutAt: new Date() },
-            meta: { roomNumber: booking.roomId?.roomNumber },
-          },
-        ],
-        { session }
-      );
+    // 2. Write audit log
+    await AuditLog.create(
+      [
+        {
+          actorId,
+          actorRole,
+          action: 'BOOKING_CHECK_OUT',
+          entityType: 'Booking',
+          entityId: booking._id.toString(),
+          before: { status: 'CHECKED_IN' },
+          after: { status: 'CHECKED_OUT', checkedOutAt: new Date() },
+          meta: { roomNumber: booking.roomId?.roomNumber },
+        },
+      ],
+      sessionOpts
+    );
 
-      result = booking;
-    });
+    return booking;
+  });
 
-    return result;
-  } finally {
-    await session.endSession();
-  }
+  return result;
 }
 
 /**
  * Staff / Admin: List all bookings with search, filters and pagination
  */
-async function listAllBookings({ status, fromDate, toDate, reference, guestEmail, page = 1, limit = 10 }) {
+async function listAllBookings({ status, fromDate, toDate, reference, guestEmail, search, page = 1, limit = 10 }) {
   const query = {};
 
   if (status) query.status = status;
-  if (reference) query.reference = new RegExp(reference.trim(), 'i');
-  if (guestEmail) query['guestDetails.email'] = new RegExp(guestEmail.trim(), 'i');
+
+  const searchFilter = search || reference;
+  if (searchFilter && searchFilter.trim()) {
+    const regex = new RegExp(searchFilter.trim(), 'i');
+    query.$or = [
+      { reference: regex },
+      { 'guestDetails.fullName': regex },
+      { 'guestDetails.email': regex },
+    ];
+  } else if (guestEmail) {
+    query['guestDetails.email'] = new RegExp(guestEmail.trim(), 'i');
+  }
 
   if (fromDate && toDate) {
     query.checkIn = { $lte: toDate };
